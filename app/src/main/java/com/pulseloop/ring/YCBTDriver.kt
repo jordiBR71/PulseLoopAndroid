@@ -157,7 +157,10 @@ class YCBTDriver(
     }
 
     override fun makeSyncEngine(): RingSyncEngine {
-        return YCBTSyncEngine(writer = writer, transfer = transfer, profile = profile).also { syncEngine = it }
+        return YCBTSyncEngine(
+            writer = writer, transfer = transfer, profile = profile,
+            monitorMemory = YCBTMonitorMemory.shared,
+        ).also { syncEngine = it }
     }
 
     private fun updateCapabilities(events: List<RingDecodedEvent>) {

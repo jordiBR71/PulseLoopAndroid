@@ -138,6 +138,7 @@ class YCBTEncoder {
         capabilities: Set<WearableCapability> = YCBTCoordinator.capabilities,
         queryChipScheme: Boolean = false,
         supportsBloodPressureMonitor: Boolean = false,
+        includeMonitors: Boolean = true,
     ): List<ByteArray> {
         val seq = mutableListOf<ByteArray>()
         seq.add(logical(YCBTGroup.GET, YCBTCommand.GET_DEVICE_INFO, byteArrayOf(0x47, 0x43)))
@@ -149,7 +150,9 @@ class YCBTEncoder {
         seq.add(logical(YCBTGroup.GET, YCBTCommand.GET_USER_CONFIG, byteArrayOf(0x43, 0x46)))
         seq.add(settings.language(languageCode))
         seq.add(settings.units(metric = profile.metric, is24Hour = is24Hour))
-        seq.addAll(monitorCommands(measurement, capabilities, supportsBloodPressureMonitor))
+        if (includeMonitors) {
+            seq.addAll(monitorCommands(measurement, capabilities, supportsBloodPressureMonitor))
+        }
         seq.add(settings.userInfo(profile))
         seq.add(enableLiveStatus())
         return seq

@@ -12,8 +12,12 @@ class YCBTSyncEngine(
         baselineCapabilities = YCBTCoordinator.capabilities,
         bitmapGatedCapabilities = YCBTCoordinator.bitmapGatedCapabilities,
     ),
+    private val monitorMemory: YCBTMonitorMemory = YCBTMonitorMemory(),
 ) : RingSyncEngine {
     private val encoder = YCBTEncoder()
+
+    /** Whether this connection re-sends the all-day monitor settings (see [YCBTMonitorMemory]). */
+    private var sendMonitorsThisConnection = true
 
     private var measurementSettings = MeasurementSettings.ALL_ON_DEFAULT
     private var userProfile = UserProfileValues(metric = true, gender = 0x02u, age = 25u, heightCm = 175u, weightKg = 70u)
@@ -54,15 +58,18 @@ class YCBTSyncEngine(
     @Synchronized
     override fun runStartup() {
         requestActivityAfterStartupHistory = true
+        sendMonitorsThisConnection = monitorMemory.shouldSend(measurementSettings)
         for (command in encoder.startupSequence(
             measurement = measurementSettings,
             profile = userProfile,
             capabilities = historyCapabilities,
             queryChipScheme = profile.queryChipSchemeAtStartup,
             supportsBloodPressureMonitor = profile.supportsBloodPressureMonitor,
+            includeMonitors = sendMonitorsThisConnection,
         )) {
             writer?.enqueue(command)
         }
+        if (sendMonitorsThisConnection) monitorMemory.recordSent(measurementSettings)
         transfer.start(types = supportedHistoryTypes(HISTORY_TYPES))
     }
 
@@ -73,12 +80,14 @@ class YCBTSyncEngine(
             val previousCapabilities = historyCapabilities
             historyCapabilities = profile.baselineCapabilities +
                 event.capabilities.intersect(profile.bitmapGatedCapabilities)
-            for (command in encoder.monitorCommands(
-                measurementSettings,
-                historyCapabilities - previousCapabilities,
-                profile.supportsBloodPressureMonitor,
-            )) {
-                writer?.enqueue(command)
+            if (sendMonitorsThisConnection) {
+                for (command in encoder.monitorCommands(
+                    measurementSettings,
+                    historyCapabilities - previousCapabilities,
+                    profile.supportsBloodPressureMonitor,
+                )) {
+                    writer?.enqueue(command)
+                }
             }
             val addedCapabilities = historyCapabilities - previousCapabilities
             val newlySupported = supportedHistoryTypes(HISTORY_TYPES)
@@ -161,6 +170,7 @@ class YCBTSyncEngine(
         )) {
             writer?.enqueue(command)
         }
+        monitorMemory.recordSent(settings)
     }
 
     override fun setUserProfile(profile: UserProfileValues) {
