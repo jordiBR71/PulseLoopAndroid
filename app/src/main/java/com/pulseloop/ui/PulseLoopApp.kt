@@ -243,6 +243,8 @@ fun PulseLoopApp() {
                 when (event) {
                     Lifecycle.Event.ON_START -> {
                         bgDisconnectJob?.cancel(); bgDisconnectJob = null
+                        // Foreground start is only allowed from here, so (re)start it on each one.
+                        com.pulseloop.service.KeepConnectedService.startIfEnabled(context.applicationContext)
                         todayVM.refreshCurrentDay()
                         activityVM.refreshCurrentDay()
                         sleepVM.refreshReferenceNight()
@@ -250,6 +252,8 @@ fun PulseLoopApp() {
                     }
                     Lifecycle.Event.ON_STOP -> {
                         if (liveWorkout.state.value.activeSession != null) return@LifecycleEventObserver
+                        // The user asked to stay connected with the app closed.
+                        if (com.pulseloop.service.KeepConnectedService.isEnabled(context)) return@LifecycleEventObserver
                         bgDisconnectJob?.cancel()
                         // Default dispatcher so the timer fires while backgrounded (a UI-frame
                         // clock would stall until the next foreground frame).

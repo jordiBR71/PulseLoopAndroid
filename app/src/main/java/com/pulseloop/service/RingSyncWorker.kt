@@ -76,6 +76,17 @@ class RingSyncWorker(
         // command queues and lets this worker's cleanup disconnect the UI-owned session.
         if (isAppForeground()) return Result.success()
 
+        // "Keep connected" holds the app's own link open: sync over it instead of opening a
+        // second client, which couldn't connect while that link owns GATT.
+        com.pulseloop.AppServices.peek()?.coordinator?.let { live ->
+            val synced = withContext(Dispatchers.Main) {
+                if (!live.isConnected) return@withContext false
+                live.runStartupSequence()
+                true
+            }
+            if (synced) return Result.success()
+        }
+
         // If scheduled spot SpO2 is in flight, yield this periodic sync window — the SpO2 worker
         // runs startup sync anyway so history is still pulled without fighting over GATT (issue #103).
         if (ScheduledSpo2Worker.isMeasuring) return Result.success()

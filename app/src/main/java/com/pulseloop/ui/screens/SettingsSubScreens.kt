@@ -1957,7 +1957,37 @@ fun WearableSettingsScreen(
         ?.let { DeviceHeroStatus.relativeShort(it, System.currentTimeMillis()) }
         ?: "Not yet"
 
+    var keepConnected by remember {
+        mutableStateOf(com.pulseloop.service.KeepConnectedService.isEnabled(context))
+    }
+
     SettingsSubScreen(title = "Wearable", onBack = onBack) {
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp)) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Mantener conectado", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Switch(
+                        checked = keepConnected,
+                        onCheckedChange = {
+                            keepConnected = it
+                            com.pulseloop.service.KeepConnectedService.setEnabled(context.applicationContext, it)
+                        },
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Mantiene el anillo conectado con la app cerrada, con una notificación fija. " +
+                        "Los datos llegan al momento, a cambio de algo más de batería en el móvil y el anillo.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Spacer(Modifier.height(12.dp))
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
