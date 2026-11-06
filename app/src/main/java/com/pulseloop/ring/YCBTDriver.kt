@@ -1,5 +1,8 @@
 package com.pulseloop.ring
 
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+
 /**
  * Ported from YCBTDriver.swift.
  * YCBT driver. Owns the length-prefixed CRC16 framing and the split-channel topology.
@@ -71,13 +74,42 @@ class YCBTDriver(
         transfer.cancel()
         pendingMeasurementReplies.clear()
         capabilities = profile.baselineCapabilities
+        startActivityPolling()
     }
 
     override fun connectionDidEnd() {
+        stopActivityPolling()
         assembler.reset()
         transfer.cancel()
         pendingMeasurementReplies.clear()
         capabilities = profile.baselineCapabilities
+    }
+
+    // Some YCBT rings acknowledge "enable live status" but never push the cumulative step count
+    // again, so today's steps stayed frozen until a reconnect. While connected, ask for it every
+    // ACTIVITY_POLL_MS. Skipped while a history transfer is running so it can't interleave with it.
+    private val pollScope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.Dispatchers.Default + kotlinx.coroutines.SupervisorJob()
+    )
+    private var pollJob: kotlinx.coroutines.Job? = null
+
+    private fun startActivityPolling() {
+        pollJob?.cancel()
+        pollJob = pollScope.launch {
+            while (isActive) {
+                kotlinx.coroutines.delay(ACTIVITY_POLL_MS)
+                if (!transfer.isActive) writer.enqueue(encoder.enableLiveStatus())
+            }
+        }
+    }
+
+    private fun stopActivityPolling() {
+        pollJob?.cancel()
+        pollJob = null
+    }
+
+    private companion object {
+        const val ACTIVITY_POLL_MS = 2 * 60 * 1000L
     }
 
     override fun ingest(data: ByteArray, from: String): List<RingDecodedEvent> {
