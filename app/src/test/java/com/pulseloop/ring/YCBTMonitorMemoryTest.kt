@@ -31,6 +31,22 @@ class YCBTMonitorMemoryTest {
     }
 
     @Test
+    fun `a restarted process remembers what was sent`() {
+        var saved: Pair<String, Long>? = null
+        val store = object : YCBTMonitorMemory.Store {
+            override fun load() = saved
+            override fun save(key: String, sentAt: Long) { saved = key to sentAt }
+        }
+        val now = 5_000L
+        val before = YCBTMonitorMemory(refreshMs = 1_000_000L, clock = { now }).apply { attach(store) }
+        before.recordSent(settings)
+
+        val after = YCBTMonitorMemory(refreshMs = 1_000_000L, clock = { now }).apply { attach(store) }
+        assertFalse(after.shouldSend(settings))
+        assertTrue(after.shouldSend(settings.copy(hrIntervalMinutes = 60)))
+    }
+
+    @Test
     fun `a reconnect does not re-send unchanged monitor settings`() {
         val memory = YCBTMonitorMemory(refreshMs = Long.MAX_VALUE)
         val first = FakeWriter()

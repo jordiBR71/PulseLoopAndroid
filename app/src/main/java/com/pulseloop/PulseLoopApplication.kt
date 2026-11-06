@@ -27,6 +27,8 @@ class PulseLoopApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         CrashLogger.install(this)
+        // Before any connection: lets a restarted process know what the ring already has.
+        com.pulseloop.ring.YCBTMonitorMemory.attachPreferences(this)
         // Before any sync can read them: Bedtime tracking no longer needs the schedule (issue #126),
         // so a Bedtime flag left on under a switched-off schedule is cleared rather than reread.
         QuietHoursPrefs.migrateIndependentBedtime(this)
